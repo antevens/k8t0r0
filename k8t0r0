@@ -1,15 +1,115 @@
 #!/usr/bin/env bash
+# Copyright (c) 2018 SD Elements Inc.
+#
+#  All Rights Reserved.
+#
+# NOTICE:  All information contained herein is, and remains
+# the property of SD Elements Incorporated and its suppliers,
+# if any.  The intellectual and technical concepts contained
+# herein are proprietary to SD Elements Incorporated
+# and its suppliers and may be covered by U.S., Canadian and other Patents,
+# patents in process, and are protected by trade secret or copyright law.
+#
+
+# Set version
+version=0.1
 
 # Import shell standard library
 source import_shtdlib
 
 # Prefixes the bash prompt with all/any arguments
-stored_ps="${PS1}"
+export stored_ps="${PS1}"
 function prefix_prompt {
     export PS1="${*} ${PS1}"
 }
 
 # Removes any prefixes previously added
-function reset_prompt {
+function strip_prompt {
     export PS1="${stored_ps}"
 }
+
+# Print usage and argument list
+function print_usage {
+cat << EOF
+
+K8T 0R0
+
+Simple utility to manage multiple kubernetes cluster definictions and connections
+
+usage: ${0} [-c] [--cluster {{fqdn or ip}}]
+            [-n] [--namespace {{namespace}}]
+            [-u] [--user {{user}}]
+
+optional arguments:
+  -r, --reset           Reset runtime environment to default
+  -h, --help            Show this help message and exit
+  -v  --verbose         Verbose console logging
+
+Version: ${version}
+EOF
+}
+
+# Parse command line arguments
+function parse_arguments {
+    debug 5 "Parse Arguments got argument: ${1}"
+    case ${1} in
+        '-')
+            # This uses the parse_arguments logic to parse a tag and it's value
+            # The value is passed on in the OPTARG variable which is standard
+            # when parsing arguments with optarg.
+            tag="${OPTARG}"
+            debug 10 'Found long argument/option'
+            parse_opt_arg OPTARG ''
+            parse_arguments "${tag}"
+        ;;
+        'c'|'cluster')
+            cluster="${OPTARG}"
+            debug 5 "Set cluster to: ${cluster}"
+        ;;
+        'n'|'namespace')
+            user="${OPTARG}"
+            debug 5 "Set namespace to: ${namespace}"
+        ;;
+        'u'|'user')
+            user="${OPTARG}"
+            debug 5 "Set user to: ${user}"
+        ;;
+        'r'|'reset')
+            user="${OPTARG}"
+            debug 5 "Resetting"
+            strip_prompt
+        ;;
+        'v'|'verbose')
+            parse_opt_arg verbosity '10'
+            export verbose=true
+            export verbosity
+            debug 1 "Set verbosity to: ${verbosity}"
+        ;;
+        'h'|'help'|'version')    # Help
+            print_usage
+            exit 0
+        ;;
+        '?')    # Invalid option specified
+            color_echo red "Invalid option '${OPTARG}'"
+            print_usage
+            exit 64
+        ;;
+        ':')    # Expecting an argument but none provided
+            color_echo red "Missing option argument for option '${OPTARG}'"
+            print_usage
+            exit 64
+        ;;
+        *)    # Anything else
+            color_echo red 'Unknown error while processing options'
+            print_usage
+            exit 64
+        ;;
+    esac
+}
+
+# Process arguments/parameters/options
+while getopts ':-:c:n:u:rvh' opt; do
+    parse_arguments "${opt}"
+done
+
+prefix_prompt "${user:-${USER}}@${cluster:-localhost}:${namespace:default}"
