@@ -100,6 +100,14 @@ function parse_arguments {
             debug 5 "Resetting"
             strip_prompt
         ;;
+        'p'|'password')
+            debug 5 "Prompting for password"
+            read -s -p "Password: " password
+        ;;
+        's'|'stdin')
+            debug 5 "Reading password from stdin"
+            password="$(cat -)"
+        ;;
         'v'|'verbose')
             parse_opt_arg verbosity '10'
             export verbose=true
@@ -132,10 +140,11 @@ function parse_arguments {
 # If being executed rather than sourced
 if  [ "${BASH_SOURCE}" == "${0}" ] ; then
     # Process arguments/parameters/options
-    while getopts ':-:c:n:u:rvh' opt; do
+    while getopts ':-:c:n:u:prsvh' opt; do
         parse_arguments "${opt}"
     done
 else
     prefix_prompt "k8s://${magenta}${user:-${USER}}${blank}@${yellow}${cluster:-localhost}${blank}:${cyan}${namespace:-default}${blank} "
+    export KUBECONFIG=
 fi
 
