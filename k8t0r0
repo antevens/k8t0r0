@@ -36,14 +36,35 @@ K8T 0R0
 
 Simple utility to manage multiple kubernetes cluster definictions and connections
 
-usage: ${0} [-c] [--cluster {{fqdn or ip}}]
-            [-n] [--namespace {{namespace}}]
-            [-u] [--user {{user}}]
+${0} can either be sourced and it's convenience functions used or it can be
+used to run individual commands using the specified arguments (or defaults)
+
+Any positional parameters following the argumments will be considered to be part
+of the command that's supposed to be run
+
+usage: ${0} [-c] [--cluster {{fqdn or ip}} ] # defaults to "localhost"
+            [-n] [--namespace {{namespace}} ] # defaults to "default"
+            [-u] [--user {{user}}] # defaults to ${USER}
 
 optional arguments:
   -r, --reset           Reset runtime environment to default
   -h, --help            Show this help message and exit
   -v  --verbose         Verbose console logging
+
+
+examples:
+
+
+# Sourced
+source ${0}
+set-k8-cluster #(defaults to "localhost")
+set-k8t-namespace (defaults to "default")
+set-k8t-user (defaults to "${USER}")
+kubectl get pods
+k9s
+
+# Individual command
+${0} -c k8s-cluster.example.com -n ingress -u jdoe kubectl get pods
 
 Version: ${version}
 EOF
@@ -107,9 +128,14 @@ function parse_arguments {
     esac
 }
 
-# Process arguments/parameters/options
-while getopts ':-:c:n:u:rvh' opt; do
-    parse_arguments "${opt}"
-done
 
-prefix_prompt "${user:-${USER}}@${cluster:-localhost}:${namespace:default}"
+# If being executed rather than sourced
+if  [ "${BASH_SOURCE}" == "${0}" ] ; then
+    # Process arguments/parameters/options
+    while getopts ':-:c:n:u:rvh' opt; do
+        parse_arguments "${opt}"
+    done
+else
+    prefix_prompt "k8s://${magenta}${user:-${USER}}${blank}@${yellow}${cluster:-localhost}${blank}:${cyan}${namespace:-default}${blank} "
+fi
+
