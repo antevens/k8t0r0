@@ -70,6 +70,16 @@ Version: ${version}
 EOF
 }
 
+# Function to handle mutually exclusive argsuments, call with variable name to
+# check and error message to show
+function  mutually_exclusive parameters {
+    if [ -n "${!1}" ] ; then
+        color_echo red "${2}"
+        print_usage
+        exit 64
+    fi
+}
+
 # Parse command line arguments
 function parse_arguments {
     debug 5 "Parse Arguments got argument: ${1}"
@@ -95,18 +105,36 @@ function parse_arguments {
             user="${OPTARG}"
             debug 5 "Set user to: ${user}"
         ;;
+        'r'|'aws_region')
+            aws_region="${OPTARG}"
+            debug 5 "Set AWS Region to: ${aws_region}"
+        ;;
+        'a'|'aws_role_arn')
+            aws_role_arn="${OPTARG}"
+            debug 5 "Set AWS Role ARN to: ${aws_role_arn}"
+        ;;
+        'm'|'aws_mfa_serial')
+            aws_mfa_serial="${OPTARG}"
+            debug 5 "Set AWS MFA Serial to: ${aws_mfa_serial}"
+        ;;
+        'k'|'aws_key_id') # AWS Access Key ID
+            aws_key_id="${OPTARG}"
+            debug 5 "Set AWS Key ID to: ${aws_key_id}"
+        ;;
         'r'|'reset')
             user="${OPTARG}"
             debug 5 "Resetting"
             strip_prompt
         ;;
-        'p'|'password')
-            debug 5 "Prompting for password"
-            read -s -p "Password: " password
+        'p'|'password') # Password/Secret/Access/Key
+            mutually_exclusive_parameters secret  "The -p/--password and -s/--stdin flags/parameters are mutually exclusive and can't be used together!"
+            debug 5 "Prompting for password/secret/key"
+            read -s -p "Password: " secret
         ;;
-        's'|'stdin')
-            debug 5 "Reading password from stdin"
-            password="$(cat -)"
+        's'|'stdin') # Password/Secret/Access/Key
+            mutually_exclusive_parameters secret  "The -s/--stdin and -p/--password flags/parameters are mutually exclusive and can't be used together!"
+            debug 5 "Reading password/secret/key from stdin"
+            secret="$(cat -)"
         ;;
         'v'|'verbose')
             parse_opt_arg verbosity '10'
@@ -136,7 +164,6 @@ function parse_arguments {
     esac
 }
 
-
 # If being executed rather than sourced
 if  [ "${BASH_SOURCE}" == "${0}" ] ; then
     # Process arguments/parameters/options
@@ -147,4 +174,3 @@ else
     prefix_prompt "k8s://${magenta}${user:-${USER}}${blank}@${yellow}${cluster:-localhost}${blank}:${cyan}${namespace:-default}${blank} "
     export KUBECONFIG=
 fi
-
