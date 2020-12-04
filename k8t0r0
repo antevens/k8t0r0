@@ -72,7 +72,7 @@ EOF
 
 # Function to handle mutually exclusive argsuments, call with variable name to
 # check and error message to show
-function  mutually_exclusive parameters {
+function  mutually_exclusive_parameters {
     if [ -n "${!1}" ] ; then
         color_echo red "${2}"
         print_usage
@@ -105,6 +105,10 @@ function parse_arguments {
             user="${OPTARG}"
             debug 5 "Set user to: ${user}"
         ;;
+        'l'|'list')
+            user="${OPTARG}"
+            debug 5 "Listing existing k8s clusters, users and contexts"
+        ;;
         'r'|'aws_region')
             aws_region="${OPTARG}"
             debug 5 "Set AWS Region to: ${aws_region}"
@@ -121,6 +125,16 @@ function parse_arguments {
             aws_key_id="${OPTARG}"
             debug 5 "Set AWS Key ID to: ${aws_key_id}"
         ;;
+        'w'|'write_config')
+            config_file_path="${OPTARG}"
+            debug 5 "Writing config file to: ${config_file_path}"
+            directory="$(dirname ${config_file_path})"
+            if [ ! -d "${directory}" ] ; then
+                color_echo red "Error, directory: ${directory} not found, exiting!"
+                exit 1
+            fi
+        ;;
+
         'r'|'reset')
             user="${OPTARG}"
             debug 5 "Resetting"
@@ -170,7 +184,31 @@ if  [ "${BASH_SOURCE}" == "${0}" ] ; then
     while getopts ':-:c:n:u:prsvh' opt; do
         parse_arguments "${opt}"
     done
+    assert whichs kubectl
+    assert whichs yq
+    #    echo "${config_file_path}"
+    mapfile -d $'\0' candidate_config_files < <(find $HOME/.kube -maxdepth 1 -type f -print0)
+    declare -a config_files
+    for file in "${candidate_config_files[@]}" ; do
+        if yq validate "${file}" ; then
+            config_files+="${file}"
+        fi
+    done
+    echo going to run yq
+    echo ${config_files[*]}
+     #if mknod /tmp/rusl p
+#    while true ; do
+     nohup yq merge "${config_files[@]}" > /tmp/rusl 2> /tmp/error_log.txt
+#     KUBECONFIG='/tmp/rusl' kubectl get pods
+#    done
 else
     prefix_prompt "k8s://${magenta}${user:-${USER}}${blank}@${yellow}${cluster:-localhost}${blank}:${cyan}${namespace:-default}${blank} "
-    export KUBECONFIG=
+    export KUBECONFIG=''
+    #wget https://github.com/mikefarah/yq/releases/download/3.4.1/yq_linux_amd64 -O $HOME/bin/yq && chmod -O $HOME/bin/yq
+
+#download special AWS kubectl commands?
+#download k9s?
+#download yq?
+#VERSION=3.4.1 and BINARY=yq_linux_amd64 wget https://github.com/mikefarah/yq/releases/download/${VERSION}/${BINARY} -O /usr/bin/yq &&\
+#    chmod +x /usr/bin/yq
 fi
