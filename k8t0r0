@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+# Import shell standard library
+source import_shtdlib
+
+# Prefixes the bash prompt with all/any arguments
+stored_ps="${PS1}"
+function prefix_prompt {
+    export PS1="${*} ${PS1}"
+}
+
+# Removes any prefixes previously added
+function reset_prompt {
+    export PS1="${stored_ps}"
+}

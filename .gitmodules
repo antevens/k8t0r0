@@ -1,0 +1,3 @@
+[submodule "shtdlib"]
+	path = shtdlib
+	url = ../../sdelements/shtdlib
