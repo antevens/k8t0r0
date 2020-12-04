@@ -190,7 +190,7 @@ if  [ "${BASH_SOURCE}" == "${0}" ] ; then
     assert whichs yq
 
     # Make sure name d pipe exists
-    named_pipe_path="${TMPDIR:-$(dirname $(mktemp --dry-run))}/${BASH_SOURCE}"
+    named_pipe_path="${TMPDIR:-$(dirname $(mktemp --dry-run))}/$(basename ${BASH_SOURCE})"
     if [ -p "${named_pipe_path}" ]; then
         debug 4 "Using existing named pipe: ${named_pipe_path}"
         chmod 0600 "${named_pipe_path}"
@@ -199,19 +199,22 @@ if  [ "${BASH_SOURCE}" == "${0}" ] ; then
         exit 1
     else
         mknod --mode=0700 "${named_pipe_path}" p
+    fi
 
     # Dynamically create a merged config file
-    while kill -0 $$ 2> /dev/null && echo bing ; do
+    while kill -0 $$ 2> /dev/null ; do
+        unset candidate_config_files
+        unset config_files
         mapfile -d $'\0' candidate_config_files < <(find $HOME/.kube -maxdepth 1 -type f -print0)
         declare -a config_files
         for file in "${candidate_config_files[@]}" ; do
-            if yq validate "${file}" ; then
+            if yq validate "${file}" 2> /dev/null ; then
                 config_files+="${file}"
                 debug 3 "Adding config file: ${file}"
             fi
         done
-        yq merge "${config_files[@]}" > "${named_pipe_path}" &
-    done
+        yq merge "${config_files[@]}" > "${named_pipe_path}"
+    done &
     KUBECONFIG="${named_pipe_path}" "${@}"
 else
     prefix_prompt "k8s://${magenta}${user:-${USER}}${blank}@${yellow}${cluster:-localhost}${blank}:${cyan}${namespace:-default}${blank} "
