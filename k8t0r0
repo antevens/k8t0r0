@@ -184,23 +184,35 @@ if  [ "${BASH_SOURCE}" == "${0}" ] ; then
     while getopts ':-:c:n:u:prsvh' opt; do
         parse_arguments "${opt}"
     done
+
+    # Make sure required binaries are available
     assert whichs kubectl
     assert whichs yq
-    #    echo "${config_file_path}"
-    mapfile -d $'\0' candidate_config_files < <(find $HOME/.kube -maxdepth 1 -type f -print0)
-    declare -a config_files
-    for file in "${candidate_config_files[@]}" ; do
-        if yq validate "${file}" ; then
-            config_files+="${file}"
-        fi
+
+    # Make sure name d pipe exists
+    named_pipe_path="${TMPDIR:-$(dirname $(mktemp --dry-run))}/${BASH_SOURCE}"
+    if [ -p "${named_pipe_path}" ]; then
+        debug 4 "Using existing named pipe: ${named_pipe_path}"
+        chmod 0600 "${named_pipe_path}"
+    elif [ -e "${named_pipe_path}" ] ; then
+        color_echo red "Found non-standard file like object ${named_pipe_path}, please move or delete to use this program, exiting!"
+        exit 1
+    else
+        mknod --mode=0700 "${named_pipe_path}" p
+
+    # Dynamically create a merged config file
+    while kill -0 $$ 2> /dev/null && echo bing ; do
+        mapfile -d $'\0' candidate_config_files < <(find $HOME/.kube -maxdepth 1 -type f -print0)
+        declare -a config_files
+        for file in "${candidate_config_files[@]}" ; do
+            if yq validate "${file}" ; then
+                config_files+="${file}"
+                debug 3 "Adding config file: ${file}"
+            fi
+        done
+        yq merge "${config_files[@]}" > "${named_pipe_path}" &
     done
-    echo going to run yq
-    echo ${config_files[*]}
-     #if mknod /tmp/rusl p
-#    while true ; do
-     nohup yq merge "${config_files[@]}" > /tmp/rusl 2> /tmp/error_log.txt
-#     KUBECONFIG='/tmp/rusl' kubectl get pods
-#    done
+    KUBECONFIG="${named_pipe_path}" "${@}"
 else
     prefix_prompt "k8s://${magenta}${user:-${USER}}${blank}@${yellow}${cluster:-localhost}${blank}:${cyan}${namespace:-default}${blank} "
     export KUBECONFIG=''
