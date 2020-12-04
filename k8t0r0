@@ -13,6 +13,17 @@
 
 # Set version
 version=0.1
+#debug_log=/dev/null
+debug_log="/tmp/${BASH_SOURCE}.debug.log"
+
+export stored_kube_config="${KUBECONFIG:-}"
+if [ -n "${KUBECONFIGDIR:-}" ] ; then
+    kube_config_dir="${KUBECONFIGDIR}"
+elif [ -n "${KUBECONFIG:-}" ] ; then
+    kube_config_dir="$(dirname ${KUBECONFIG})"
+else
+    kube_config_dir="${HOME}/.kube"
+fi
 
 # Import shell standard library
 source import_shtdlib
@@ -134,7 +145,6 @@ function parse_arguments {
                 exit 1
             fi
         ;;
-
         'r'|'reset')
             user="${OPTARG}"
             debug 5 "Resetting"
@@ -201,19 +211,27 @@ if  [ "${BASH_SOURCE}" == "${0}" ] ; then
         mknod --mode=0700 "${named_pipe_path}" p
     fi
 
+#    debug 10 "Rendering file: ${destination}/${file#${path}} from template: ${file}"
+#    envsubst < "${file}" > "${destination}/${file#${path}}" "$(compgen -v | sed -e 's/^/\$/g' | tr '\n' ',')"
+
+
     # Dynamically create a merged config file
-    while kill -0 $$ 2> /dev/null ; do
+    while kill -0 $$ 2> "${debug_log}" ; do
         unset candidate_config_files
         unset config_files
-        mapfile -d $'\0' candidate_config_files < <(find $HOME/.kube -maxdepth 1 -type f -print0)
+        mapfile -d $'\0' candidate_config_files < <(find "${kube_config_dir}" -maxdepth 1 -type f -print0)
         declare -a config_files
         for file in "${candidate_config_files[@]}" ; do
-            if yq validate "${file}" 2> /dev/null ; then
+            if yq validate "${file}" 2> "${debug_log}" ; then
                 config_files+="${file}"
                 debug 3 "Adding config file: ${file}"
             fi
         done
-        yq merge "${config_files[@]}" > "${named_pipe_path}"
+        if [ "${#candidate_config_files[@]}" -gt 0 ] ; then
+            yq merge "${config_files[@]}" > "${named_pipe_path}"
+        else
+            color_echo yellow "No config files found under ${kube_config_dir}"
+        fi
     done &
     KUBECONFIG="${named_pipe_path}" "${@}"
 else
@@ -221,6 +239,9 @@ else
     export KUBECONFIG=''
     #wget https://github.com/mikefarah/yq/releases/download/3.4.1/yq_linux_amd64 -O $HOME/bin/yq && chmod -O $HOME/bin/yq
 
+
+#snap install aws-cli --classic
+#curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 #download special AWS kubectl commands?
 #download k9s?
 #download yq?
